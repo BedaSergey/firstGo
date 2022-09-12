@@ -1,10 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"log"
 	"net/http"
 	"os"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // Создаем структуру `application` для хранения зависимостей всего веб-приложения.
@@ -20,6 +23,8 @@ func main() {
 	// Добавляем небольшую справку, объясняющая, что содержит данный флаг.
 	// Значение флага будет сохранено в переменной addr.
 	addr := flag.String("addr", ":4000", "Сетевой адрес HTTP")
+	// Определение нового флага из командной строки для настройки MySQL подключения.
+	dsn := flag.String("dsn", "web:pass@/snippetbox?parseTime=true", "Название MuSQL источника данных")
 	// Мы вызываем функцию flag.Parse() для извлечения флага из командной строки.
 	// Она считывает значение флага из командной строки и присваивает его содержимое
 	// переменной. Вам нужно вызвать ее *до* использования переменной addr
@@ -38,6 +43,18 @@ func main() {
 	// названия файла и номера строки где обнаружилась ошибка.
 	// Если вы хотите включить весь путь файла в лог  вместо просто названия файла, при создании логгера можно использовать флаг log.Llongfile вместо log.Lshortfile.Вы также можете заставить свой логгер  использовать UTC дату (вместо локальной), добавив флаг log.LUTC.
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+
+	// Чтобы функция main() была более компактной, мы поместили код для создания
+	// пула соединений в отдельную функцию openDB(). Мы передаем в нее полученный
+	// источник данных (DSN) из флага командной строки.
+	db, err := openDB(*dsn)
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+
+	// Мы также откладываем вызов db.Close(), чтобы пул соединений был закрыт
+	// до выхода из функции main().
+	defer db.Close()
 
 	app := &application{
 		errorLog: errorLog,
@@ -63,7 +80,20 @@ func main() {
 	infoLog.Printf("Запуск сервера на %s", *addr)
 	// err := http.ListenAndServe(*addr, mux)
 	// Вызываем метод ListenAndServe() от нашей новой структуры http.Server
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	errorLog.Fatal(err)
 	// log.Fatal(err) // Сообщение о фатальной ошибке в работе программы
+}
+
+// Функция openDB() обертывает sql.Open() и возвращает пул соединений sql.DB
+// для заданной строки подключения (DSN).
+func openDB(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
