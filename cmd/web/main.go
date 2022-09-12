@@ -7,6 +7,14 @@ import (
 	"os"
 )
 
+// Создаем структуру `application` для хранения зависимостей всего веб-приложения.
+// Пока, что мы добавим поля только для двух логгеров, но
+// мы будем расширять данную структуру по мере усложнения приложения.
+type application struct {
+	errorLog *log.Logger
+	infoLog  *log.Logger
+}
+
 func main() {
 	// Создаем новый флаг командной строки, значение по умолчанию: ":4000".
 	// Добавляем небольшую справку, объясняющая, что содержит данный флаг.
@@ -31,10 +39,15 @@ func main() {
 	// Если вы хотите включить весь путь файла в лог  вместо просто названия файла, при создании логгера можно использовать флаг log.Llongfile вместо log.Lshortfile.Вы также можете заставить свой логгер  использовать UTC дату (вместо локальной), добавив флаг log.LUTC.
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
+	app := &application{
+		errorLog: errorLog,
+		infoLog:  infoLog,
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", home)
-	mux.HandleFunc("/snippet", showSnippet)
-	mux.HandleFunc("/snippet/create", createSnippet)
+	mux.HandleFunc("/", app.home)
+	mux.HandleFunc("/snippet", app.showSnippet)
+	mux.HandleFunc("/snippet/create", app.createSnippet)
 
 	// Инициализируем FileServer, он будет обрабатывать
 	// HTTP-запросы к статическим файлам из папки "./ui/static".
